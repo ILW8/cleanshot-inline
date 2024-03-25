@@ -10,6 +10,31 @@
 
 export default {
 	async fetch(request, env, ctx) {
-		return new Response("Hello World!");
+		let reqUrl = new URL(request.url);
+
+		if (!reqUrl.pathname.startsWith("/inline"))
+			return await fetch(request);
+
+		reqUrl.pathname = reqUrl.pathname.replace("/inline", "")
+		reqUrl.hostname = 'cln.sh';
+
+		request = new Request(reqUrl.toString(), new Request(request));
+
+		let response = await fetch(request)
+		let maxRedirects = 20 // Prevent infinite loops
+
+		while (response.status >= 300 && response.status < 400 && maxRedirects > 0) {
+			if (!response.headers.has('Location')) {
+				break // No location header, can't follow
+			}
+			const location = response.headers.get('Location')
+			response = await fetch(location, {
+				method: request.method,
+				headers: request.headers,
+			})
+			maxRedirects -= 1
+		}
+
+		return response
 	},
 };
